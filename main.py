@@ -11,9 +11,78 @@ default_app = firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 def main():
-    gui.Window(title="Ask Salesforce Admin", layout=[[]], margins=(300,300)).read()
-    show_menu()
+    win = gui.Window("Ask Salesforce Admin", layout_creator())
+    while True:
+        event, values = win.read()
+        if event == "Exit" or event == gui.WIN_CLOSED:
+            break
+        elif event == "k_add_users_btn":
+            add_user(values['k_users_field'], win)
+            #win["k_history_box"].Update([f"Added user {values['k_users_field']}"])
 
+    win.close()
+    #show_menu()
+
+def layout_creator():
+    add_users = [
+        gui.Text("Add Users"),
+        gui.In(size=(50,1), enable_events=True, key="k_users_field"),
+        gui.FileBrowse(key="k_users_folder"),
+        gui.Button("Add", key="k_add_users_btn")
+        ]
+    action_history = [
+        gui.Listbox(
+            values=[], enable_events=True, size = (50,20), key = "k_history_box"
+        )
+    ]
+    layout = []
+    layout.append([add_users, action_history])
+    return layout
+    
+def alert_box(alert_text):
+    gui.popup(alert_text)
+
+def add_user(text, win):
+    if(Path(text).exists() and text.endswith('.txt')):
+        #Create users from text file
+        print("Create users from file")
+        file = open(text, 'rt')
+        for line in file:
+            create_user(line.lstrip().rstrip(), win) #Remove any leading whitespace to not get an error
+    elif(Path(text).exists()):
+        #File is not .txt raise error
+        alert_box("Invalid file")
+    elif(text.find('@') != -1):
+        #Is mail
+        create_user(text.lstrip().rstrip(), win)
+        print("Adding single user")
+    else:
+        #Not a valid mail
+        alert_box("Invalid mail")
+
+def create_user(mail, win):
+    elements_list = win["k_history_box"].get_list_values()
+    msg_cur = ""
+    try:
+        new_user = auth.create_user(
+            email = mail,
+            password = str(random.randint(111111,999999)),
+            disabled = False
+        )
+        msg_cur = [f"Added new email {mail} succesfully"]
+        print("Added successfully")
+        auth.generate_password_reset_link(new_user)
+    except auth._auth_utils.EmailAlreadyExistsError:
+        msg_cur = [f"Email already exists {mail}"]
+        print(f"Email already exists {mail}")
+    except:
+        msg_cur = [f"Error occured while adding mail {mail}"]
+        pass
+    elements_list.append(msg_cur)
+    win["k_history_box"].update(elements_list)
+
+        
+'''
 def show_menu():
     menu = {}
     menu['1'] = "Add users"
@@ -118,6 +187,7 @@ def check_certification():
                 print(f"{dict_doc['Mail']} hasn't certified with a score of {dict_doc['Score']} in {dict_doc['timeFinish'] - dict_doc['timeBegin']}")
             if(download_data):
                 file.write(f"{doc.id.lstrip(code.upper())},{dict_doc['Mail']},{dict_doc['Score']},{dict_doc['Win']}, {dict_doc['timeFinish'] - dict_doc['timeBegin']}\n")
+'''
 if __name__ == "__main__":
     main()
 
