@@ -1,15 +1,21 @@
-from re import A
 import firebase_admin
 from pathlib import Path
 import random
-from firebase_admin import credentials, auth, firestore
+from firebase_admin import credentials, auth, firestore, storage
+import google.auth
+from google.cloud import storage as storGC
 import PySimpleGUI as gui
 import datetime
 
 #Save your google credentials in the same folder
 cred = credentials.Certificate("credentials.json")
+cred_google = google.auth.load_credentials_from_file("credentials.json")
 default_app = firebase_admin.initialize_app(cred)
 db = firestore.client()
+bucket = storage.bucket('unityloteria.appspot.com')
+
+input_box_size = (20,1)
+listbox_size = (70,10)
 
 def main():
     win = gui.Window("Ask Salesforce Admin", layout_creator())
@@ -32,6 +38,10 @@ def main():
             search_users(values["k_val_search_field"], win)
         elif event == "k_code_btn":
             check_certification(values["k_val_code_field"], values["k_code_cb"], win)
+        elif event == "k_download_question_btn":
+            download_question_bank(values["k_val_questions_field"])
+        elif event == "k_upload_question_btn":
+            upload_question_bank(values["k_val_questions_field"])
 
     win.close()
     #show_menu()
@@ -39,30 +49,38 @@ def main():
 def layout_creator():
     add_users = [
         gui.Text("Users/UID/File"),
-        gui.In(size=(50,1), enable_events=True, key="k_val_deladd_field"),
-        gui.FileBrowse(key="k_users_folder"),
+        gui.In(size=input_box_size,enable_events=True, key="k_val_deladd_field"),
+        gui.FileBrowse(key="k_users_folder", target="k_val_deladd_field"),
         gui.Button("Add", key="k_add_users_btn"),
         gui.Button("Delete", key="k_delete_users_btn")
         ]
     search_show_users = [
         gui.Text("Searches for given user, if left blank shows all users"),
-        gui.In(size=(35,1), enable_events=True, key="k_val_search_field"),
+        gui.In(size=input_box_size,enable_events=True, key="k_val_search_field"),
         gui.Button("Search", key="k_search_btn")
     ]
     code_search = [
         gui.Text("Verify certification for given code"),
-        gui.In(size=(35,1), enable_events=True, key="k_val_code_field"),
+        gui.In(size=input_box_size,enable_events=True, key="k_val_code_field"),
         gui.Button("Verify", key="k_code_btn"),
         gui.Checkbox("Save to computer", default=False, key="k_code_cb")
     ]
+    bank_question = [
+        gui.Text("Download Bank of Question of specified code or upload from file"),
+        gui.In(size=input_box_size,enable_events=True, key="k_val_questions_field"),
+        gui.Button("Download", key="k_download_question_btn"),
+        gui.FileBrowse(key="k_questions_folder", target="k_val_questions_field"),
+        gui.Button("Upload", key="k_upload_question_btn")
+        
+    ]
     action_history = [
         gui.Listbox(
-            values=[], enable_events=True, size = (80,10), key = "k_history_box"
+            values=[], enable_events=True,size=listbox_size, key = "k_history_box"
         )
     ]
     
     layout = []
-    layout.append([add_users, search_show_users, code_search, action_history])
+    layout.append([add_users, search_show_users, code_search, bank_question, action_history])
     return layout
     
 def alert_box(alert_text):
@@ -199,6 +217,29 @@ def check_certification(code, save, win):
         win["k_history_box"].update(elements_list)
     else:
         win["k_history_box"].update([f"No certifications on record for code {code}"])
+
+#Downloads to same folder a file containing the bank questions, it is encrypted for the moment
+#but it will be downloaded uncrypted later
+def download_question_bank(code):
+    storage_client = storGC.Client(credentials=cred_google)
+    buck = storage_client.bucket(bucket)
+    codeBucket = "BankQuestions/" + code + ".txt.xd"
+    blob = buck.blob(codeBucket)
+    blob.download_to_filename(code)
+    #Unenctription after this point to save a new file as a readable .txt.
+    #Maybe convert to csv later 
+
+    print(f"Succesfully downloaded {code}")
+
+
+#Upload a file containing a new bank of questions with a given code and from a file
+def upload_question_bank(file):
+    #Create a copy of the file and encrypt it for that new one to be uploaded.
+    storage_client = storGC.Client()
+    buck = storage_client.bucket(bucket)
+    blob = buck.blob("newUpload.txt.xd")
+
+    blob.upload_from_filename(file)
 
 if __name__ == "__main__":
     main()
