@@ -6,13 +6,17 @@ import google.auth
 from google.cloud import storage as storGC
 import PySimpleGUI as gui
 import datetime
+import os
+from Cryptodome.Cipher import AES
 
 #Save your google credentials in the same folder
 cred = credentials.Certificate("credentials.json")
 cred_google = google.auth.load_credentials_from_file("credentials.json")
-default_app = firebase_admin.initialize_app(cred)
+default_app = firebase_admin.initialize_app(cred, {
+    'storageBucket' : 'unityloteria.appspot.com'
+})
 db = firestore.client()
-bucket = storage.bucket('unityloteria.appspot.com')
+bucket = storage.bucket()
 
 input_box_size = (20,1)
 listbox_size = (70,10)
@@ -221,25 +225,38 @@ def check_certification(code, save, win):
 #Downloads to same folder a file containing the bank questions, it is encrypted for the moment
 #but it will be downloaded uncrypted later
 def download_question_bank(code):
-    storage_client = storGC.Client(credentials=cred_google)
-    buck = storage_client.bucket(bucket)
-    codeBucket = "BankQuestions/" + code + ".txt.xd"
-    blob = buck.blob(codeBucket)
-    blob.download_to_filename(code)
-    #Unenctription after this point to save a new file as a readable .txt.
-    #Maybe convert to csv later 
+    code = code.upper()
+    source_name = "BankQuestions/" + code + ".txt.xd"
+    filename_encrypt = code + ".txt.xd"
+    filename_decrypt = code + ".txt"
 
-    print(f"Succesfully downloaded {code}")
+    storage_client = storGC.Client.from_service_account_json("credentials.json")
+    bucket_bank = storage_client.bucket("unityloteria.appspot.com")
+
+    if(Path.exists(filename_encrypt)):
+        os.remove(filename_encrypt)
+    
+    try:
+        blob = bucket_bank.blob(source_name)
+        blob.download_to_filename(filename_encrypt)
+        print("Succesfully downloaded")
+    except:
+        print("File not found")
+    
+    #Since the encryption is primarily made in-game, program will call a C# script, same as the one in the game so it can 
+    #encrypt and decrypt files if successful
 
 
 #Upload a file containing a new bank of questions with a given code and from a file
 def upload_question_bank(file):
     #Create a copy of the file and encrypt it for that new one to be uploaded.
-    storage_client = storGC.Client()
-    buck = storage_client.bucket(bucket)
-    blob = buck.blob("newUpload.txt.xd")
+    storage_client = storGC.Client.from_service_account_json("credentials.json")
+    bucket_bank = storage_client.bucket("unityloteria.appspot.com")
+    blob = bucket_bank.blob("newUpload.txt.xd")
 
+    #Verify file for existence
     blob.upload_from_filename(file)
+    print("File uploaded")
 
 if __name__ == "__main__":
     main()
