@@ -7,9 +7,9 @@ from google.cloud import storage as storGC
 import PySimpleGUI as gui
 import datetime
 import os
-from Cryptodome.Cipher import AES
-
-#Save your google credentials in the same folder
+import subprocess
+#Save your google credentials in the same folder, one is used for all except storage
+#the other for storage (cred_google)
 cred = credentials.Certificate("credentials.json")
 cred_google = google.auth.load_credentials_from_file("credentials.json")
 default_app = firebase_admin.initialize_app(cred, {
@@ -20,6 +20,8 @@ bucket = storage.bucket()
 
 input_box_size = (20,1)
 listbox_size = (70,10)
+ENCRYPT_FILE_PATH = "./EncryptFile.exe"
+UNECRYPT_FILE_PATH = "./CryptDecrypt.exe"
 
 def main():
     win = gui.Window("Ask Salesforce Admin", layout_creator())
@@ -43,9 +45,9 @@ def main():
         elif event == "k_code_btn":
             check_certification(values["k_val_code_field"], values["k_code_cb"], win)
         elif event == "k_download_question_btn":
-            download_question_bank(values["k_val_questions_field"])
+            download_question_bank(values["k_val_questions_field"], win)
         elif event == "k_upload_question_btn":
-            upload_question_bank(values["k_val_questions_field"])
+            upload_question_bank(values["k_val_questions_field"], win)
 
     win.close()
     #show_menu()
@@ -150,7 +152,7 @@ def del_users(text, win):
         #File is not .txt raise error
         alert_box("Invalid file")
     else:
-        #Might be uid
+        #Tries as uid, if not fails
         delete_users(text.lstrip().rstrip(), win)
 
 def search_users(text, win):
@@ -222,9 +224,8 @@ def check_certification(code, save, win):
     else:
         win["k_history_box"].update([f"No certifications on record for code {code}"])
 
-#Downloads to same folder a file containing the bank questions, it is encrypted for the moment
-#but it will be downloaded uncrypted later
-def download_question_bank(code):
+#Downloads to same folder a file containing the bank questions unencrypted
+def download_question_bank(code, win):
     code = code.upper()
     source_name = "BankQuestions/" + code + ".txt.xd"
     filename_encrypt = code + ".txt.xd"
@@ -233,30 +234,42 @@ def download_question_bank(code):
     storage_client = storGC.Client.from_service_account_json("credentials.json")
     bucket_bank = storage_client.bucket("unityloteria.appspot.com")
 
-    if(Path.exists(filename_encrypt)):
-        os.remove(filename_encrypt)
-    
     try:
         blob = bucket_bank.blob(source_name)
         blob.download_to_filename(filename_encrypt)
-        print("Succesfully downloaded")
+        win['k_history_box'].update(["Succesfully downloaded " + code])
     except:
-        print("File not found")
-    
-    #Since the encryption is primarily made in-game, program will call a C# script, same as the one in the game so it can 
-    #encrypt and decrypt files if successful
+        win['k_history_box'].update(["Unable to download " + code])
+        return -1
 
+    value = subprocess.run([UNECRYPT_FILE_PATH, filename_encrypt], capture_output=True)
+    if(value.returncode == 0):
+        win['k_history_box'].update([f"Succesfully decrypted file {filename_decrypt}"])
+    else:
+        win['k_history_box'].update(["Unable to decrypt file"])
 
 #Upload a file containing a new bank of questions with a given code and from a file
-def upload_question_bank(file):
-    #Create a copy of the file and encrypt it for that new one to be uploaded.
-    storage_client = storGC.Client.from_service_account_json("credentials.json")
-    bucket_bank = storage_client.bucket("unityloteria.appspot.com")
-    blob = bucket_bank.blob("newUpload.txt.xd")
-
-    #Verify file for existence
-    blob.upload_from_filename(file)
-    print("File uploaded")
+def upload_question_bank(file, win):
+    if not(Path(file).exists() and file.endswith('.txt')):
+        list_elements = win['k_history_box'].get_list_values()
+        list_elements.append([f"{file} is not a valid file to upload"])
+        win['k_history_box'].update(list_elements)
+    else:
+        up_file = file[file.rindex('/')+1:] + ".xd"
+        value = subprocess.run([ENCRYPT_FILE_PATH, file], capture_output=True)
+        if(value.returncode != 0):
+            list_elements = win['k_history_box'].get_list_values()
+            list_elements.append([f"{up_file} was not succesfully encrypted"])
+            win['k_history_box'].update(list_elements)            
+        else:
+            storage_client = storGC.Client.from_service_account_json("credentials.json")
+            bucket_bank = storage_client.bucket("unityloteria.appspot.com")
+            blob = bucket_bank.blob(f"BankQuestions/{up_file}")
+            
+            blob.upload_from_filename(up_file)
+            list_elements = win['k_history_box'].get_list_values()
+            list_elements.append([f"{up_file} was succesfully uploaded"])
+            win['k_history_box'].update(list_elements)
 
 if __name__ == "__main__":
     main()
