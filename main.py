@@ -6,22 +6,21 @@ import google.auth
 from google.cloud import storage as storGC
 import PySimpleGUI as gui
 import datetime
-import os
 import subprocess
-#Save your google credentials in the same folder, one is used for all except storage
-#the other for storage (cred_google)
-cred = credentials.Certificate("credentials.json")
-cred_google = google.auth.load_credentials_from_file("credentials.json")
-default_app = firebase_admin.initialize_app(cred, {
+
+###########################
+# CONSTANTS
+INPUT_BOX_SIZE = (20,1)
+LISTBOX_SIZE = (70,10)
+ENCRYPT_FILE_PATH = "./EncryptFile.exe"
+UNECRYPT_FILE_PATH = "./DecryptFile.exe"
+CREDENTIALS_PATH = "credentials.json"
+CREDENTIAL_CERTIFICATE = credentials.Certificate(CREDENTIALS_PATH) #check if path exists
+DEFAULT_APP = firebase_admin.initialize_app(CREDENTIAL_CERTIFICATE, {
     'storageBucket' : 'unityloteria.appspot.com'
 })
-db = firestore.client()
-bucket = storage.bucket()
-
-input_box_size = (20,1)
-listbox_size = (70,10)
-ENCRYPT_FILE_PATH = "./EncryptFile.exe"
-UNECRYPT_FILE_PATH = "./CryptDecrypt.exe"
+DB = firestore.client() #check_certificate()
+###########################
 
 def main():
     win = gui.Window("Ask Salesforce Admin", layout_creator())
@@ -33,13 +32,13 @@ def main():
             if(values['k_val_deladd_field'] != ""):
                 add_user(values['k_val_deladd_field'], win)
             else:
-                alert_box("Fill in the requiered spaces")
+                show_alert("Fill in the requiered spaces")
             #win["k_history_box"].Update([f"Added user {values['k_users_field']}"])
         elif event == "k_delete_users_btn":
             if(values['k_val_deladd_field'] != ""):
                 del_users(values['k_val_deladd_field'], win)
             else:
-                alert_box("Fill in the requiered spaces")
+                show_alert("Fill in the requiered spaces")
         elif event == "k_search_btn":
             search_users(values["k_val_search_field"], win)
         elif event == "k_code_btn":
@@ -48,40 +47,43 @@ def main():
             download_question_bank(values["k_val_questions_field"], win)
         elif event == "k_upload_question_btn":
             upload_question_bank(values["k_val_questions_field"], win)
-
     win.close()
-    #show_menu()
 
+#Returns layout for the GUI
 def layout_creator():
     add_users = [
         gui.Text("Users/UID/File"),
-        gui.In(size=input_box_size,enable_events=True, key="k_val_deladd_field"),
+        gui.In(size=INPUT_BOX_SIZE,enable_events=True, key="k_val_deladd_field"),
         gui.FileBrowse(key="k_users_folder", target="k_val_deladd_field"),
         gui.Button("Add", key="k_add_users_btn"),
         gui.Button("Delete", key="k_delete_users_btn")
         ]
+
     search_show_users = [
         gui.Text("Searches for given user, if left blank shows all users"),
-        gui.In(size=input_box_size,enable_events=True, key="k_val_search_field"),
+        gui.In(size=INPUT_BOX_SIZE,enable_events=True, key="k_val_search_field"),
         gui.Button("Search", key="k_search_btn")
     ]
+
     code_search = [
         gui.Text("Verify certification for given code"),
-        gui.In(size=input_box_size,enable_events=True, key="k_val_code_field"),
+        gui.In(size=INPUT_BOX_SIZE,enable_events=True, key="k_val_code_field"),
         gui.Button("Verify", key="k_code_btn"),
         gui.Checkbox("Save to computer", default=False, key="k_code_cb")
     ]
+
     bank_question = [
         gui.Text("Download Bank of Question of specified code or upload from file"),
-        gui.In(size=input_box_size,enable_events=True, key="k_val_questions_field"),
+        gui.In(size=INPUT_BOX_SIZE,enable_events=True, key="k_val_questions_field"),
         gui.Button("Download", key="k_download_question_btn"),
         gui.FileBrowse(key="k_questions_folder", target="k_val_questions_field"),
         gui.Button("Upload", key="k_upload_question_btn")
         
     ]
+
     action_history = [
         gui.Listbox(
-            values=[], enable_events=True,size=listbox_size, key = "k_history_box"
+            values=[], enable_events=True,size=LISTBOX_SIZE, key = "k_history_box"
         )
     ]
     
@@ -89,9 +91,21 @@ def layout_creator():
     layout.append([add_users, search_show_users, code_search, bank_question, action_history])
     return layout
     
-def alert_box(alert_text):
-    gui.popup(alert_text, title="Alert")
+#Updates action history box from GUI  
+def update_listbox(text, win):
+    listbox_elements = win["k_history_box"].get_list_values()
+    listbox_elements.append([text])
+    win['k_history_box'].update(listbox_elements)
 
+#Clears action history and cleans new one
+def new_listbox(text, win):
+    win['k_history_box'].update([text])
+
+#Creates popup window containing an alert raised by the program
+def show_alert(text):
+    gui.popup(text, title="Caution!")
+
+#Adds new user/s from a given mail or text file and calls create_user() for its creation 
 def add_user(text, win):
     if(Path(text).exists() and text.endswith('.txt')):
         #Create users from text file
@@ -100,14 +114,14 @@ def add_user(text, win):
             create_user(line.lstrip().rstrip(), win) #Remove any leading whitespace to not get an error
     elif(Path(text).exists()):
         #File is not .txt raise error
-        alert_box("Invalid file")
+        show_alert("Invalid file")
     elif(text.find('@') != -1):
-        #Is mail
+        #Create user from mail
         create_user(text.lstrip().rstrip(), win)
     else:
-        #Not a valid mail
-        alert_box("Invalid mail")
+        show_alert("Invalid mail")
 
+#Creates user from given mail with a random 6-digit numeric password, sends mail to change it as well
 def create_user(mail, win):
     elements_list = win["k_history_box"].get_list_values()
     msg_cur = ""
@@ -150,7 +164,7 @@ def del_users(text, win):
             delete_users(line.lstrip().rstrip(), win) #Remove any leading whitespace to not get an error
     elif(Path(text).exists()):
         #File is not .txt raise error
-        alert_box("Invalid file")
+        show_alert("Invalid file")
     else:
         #Tries as uid, if not fails
         delete_users(text.lstrip().rstrip(), win)
@@ -171,7 +185,7 @@ def search_users(text, win):
             
             win["k_history_box"].update(elements_list)
         except:
-            alert_box(f"Unable to get fetch users")
+            show_alert(f"Unable to get fetch users")
     elif(text.find('@') != -1):
         try:
             user = auth.get_user_by_email(text)
@@ -182,7 +196,7 @@ def search_users(text, win):
             elements_list.append(msg)
             win["k_history_box"].update(elements_list)
         except:
-            alert_box(f"Unable to get user with mail: {text}")
+            show_alert(f"Unable to get user with mail: {text}")
     else:
         try:
             user = auth.get_user(text)
@@ -193,12 +207,12 @@ def search_users(text, win):
             elements_list.append(msg)
             win["k_history_box"].update(elements_list)
         except:
-            alert_box(f"Unable to get user with UID: {text}")
+            show_alert(f"Unable to get user with UID: {text}")
 
 def check_certification(code, save, win):
     has_one = False
     code = code.upper()
-    users_colection = db.collection(u'userScores')
+    users_colection = DB.collection(u'userScores')
     docs = users_colection.stream()
     file_path = "CertificationScores" + code + ".csv"
     if(save):
@@ -231,7 +245,7 @@ def download_question_bank(code, win):
     filename_encrypt = code + ".txt.xd"
     filename_decrypt = code + ".txt"
 
-    storage_client = storGC.Client.from_service_account_json("credentials.json")
+    storage_client = storGC.Client.from_service_account_json(CREDENTIALS_PATH)
     bucket_bank = storage_client.bucket("unityloteria.appspot.com")
 
     try:
@@ -262,7 +276,7 @@ def upload_question_bank(file, win):
             list_elements.append([f"{up_file} was not succesfully encrypted"])
             win['k_history_box'].update(list_elements)            
         else:
-            storage_client = storGC.Client.from_service_account_json("credentials.json")
+            storage_client = storGC.Client.from_service_account_json(CREDENTIALS_PATH)
             bucket_bank = storage_client.bucket("unityloteria.appspot.com")
             blob = bucket_bank.blob(f"BankQuestions/{up_file}")
             
