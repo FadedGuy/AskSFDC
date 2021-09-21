@@ -11,7 +11,7 @@ import subprocess
 ###########################
 # CONSTANTS
 INPUT_BOX_SIZE = (20,1)
-LISTBOX_SIZE = (70,10)
+LISTBOX_SIZE = (85,10)
 ENCRYPT_FILE_PATH = "./EncryptFile.exe"
 UNECRYPT_FILE_PATH = "./DecryptFile.exe"
 CREDENTIALS_PATH = "credentials.json"
@@ -21,6 +21,14 @@ DEFAULT_APP = firebase_admin.initialize_app(CREDENTIAL_CERTIFICATE, {
 })
 DB = firestore.client() #check_certificate()
 ###########################
+# Reload certifications so it includes new ones each time it is called since now
+# it only shows the ones that were when the program was initially called 
+# 
+# Should consider merging encryption and unencryption in the same executable and flag 
+# depending on which mode it's supposed to use
+# 
+# Padding is invalid and cannot be removed.
+
 
 def main():
     win = gui.Window("Ask Salesforce Admin", layout_creator())
@@ -94,8 +102,11 @@ def layout_creator():
 #Updates action history box from GUI  
 def update_listbox(text, win):
     listbox_elements = win["k_history_box"].get_list_values()
-    listbox_elements.append([text])
-    win['k_history_box'].update(listbox_elements)
+    if(len(listbox_elements) > 10):
+        new_listbox(text, win)
+    else:
+        listbox_elements.append([text])
+        win['k_history_box'].update(listbox_elements)
 
 #Clears action history and cleans new one
 def new_listbox(text, win):
@@ -123,7 +134,6 @@ def add_user(text, win):
 
 #Creates user from given mail with a random 6-digit numeric password, sends mail to change it as well
 def create_user(mail, win):
-    elements_list = win["k_history_box"].get_list_values()
     msg_cur = ""
     try:
         new_user = auth.create_user(
@@ -137,12 +147,11 @@ def create_user(mail, win):
         msg_cur = f"Email already exists {mail}"
     except:
         msg_cur = f"Added new email {mail} succesfully"
-    elements_list.append(msg_cur)
-    win["k_history_box"].update(elements_list)
+    
+    update_listbox(msg_cur, win)
     
 
 def delete_users(uid, win):
-    elements_list = win["k_history_box"].get_list_values()
     msg_cur = ""
     try:
         auth.delete_user(uid=uid)
@@ -152,9 +161,7 @@ def delete_users(uid, win):
     except:
         msg_cur = f"Error occured while deleting {uid}"
         pass
-    elements_list.append(msg_cur)
-    win["k_history_box"].update(elements_list)
-
+    update_listbox(msg_cur, win)
 
 def del_users(text, win):
     if(Path(text).exists() and text.endswith('.txt')):
@@ -175,37 +182,31 @@ def search_users(text, win):
             page = auth.list_users()
             while page:
                 page = page.get_next_page()
-            elements_list = win["k_history_box"].get_list_values()
             msg = ""
             for user in auth.list_users().iterate_all():
                 ts = float(user.user_metadata.last_sign_in_timestamp)
                 ts = ts/1000
                 msg = f"Mail: {user.email}, UID: {user.uid}, Last Accesed: {datetime.datetime.utcfromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')}"
-                elements_list.append(msg)
-            
-            win["k_history_box"].update(elements_list)
+                update_listbox(msg, win)            
         except:
             show_alert(f"Unable to get fetch users")
+            #When blank
     elif(text.find('@') != -1):
         try:
             user = auth.get_user_by_email(text)
-            elements_list = win["k_history_box"].get_list_values()
             ts = float(user.user_metadata.last_sign_in_timestamp)
             ts = ts/1000
             msg = f"Mail: {user.email}, UID: {user.uid}, Last Accesed: {datetime.datetime.utcfromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')}"
-            elements_list.append(msg)
-            win["k_history_box"].update(elements_list)
+            update_listbox(msg, win)
         except:
             show_alert(f"Unable to get user with mail: {text}")
     else:
         try:
             user = auth.get_user(text)
-            elements_list = win["k_history_box"].get_list_values()
             ts = float(user.user_metadata.last_sign_in_timestamp)
             ts = ts/1000
             msg = f"Mail: {user.email}, UID: {user.uid}, Last Accesed: {datetime.datetime.utcfromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')}"
-            elements_list.append(msg)
-            win["k_history_box"].update(elements_list)
+            update_listbox(msg, win)
         except:
             show_alert(f"Unable to get user with UID: {text}")
 
@@ -221,22 +222,18 @@ def check_certification(code, save, win):
         else:
             file = open(file_path, "x")
         file.write("UID     ,Mail   ,Score,Win,Time to Answer\n")
-    elements_list = []
     for doc in docs:
         dict_doc = doc.to_dict()
         if(doc.id.endswith(code) and code != ""):
             has_one = True
             if(dict_doc.get("Win")):
-                elements_list.append(f"{dict_doc['Mail']} has certified with a score of {dict_doc['Score']} in {dict_doc['timeFinish'] - dict_doc['timeBegin']}")
+                update_listbox(f"{dict_doc['Mail']} has certified with a score of {dict_doc['Score']} in {dict_doc['timeFinish'] - dict_doc['timeBegin']}", win)
             else:
-                elements_list.append(f"{dict_doc['Mail']} hasn't certified with a score of {dict_doc['Score']} in {dict_doc['timeFinish'] - dict_doc['timeBegin']}")
-
+                update_listbox(f"{dict_doc['Mail']} hasn't certified with a score of {dict_doc['Score']} in {dict_doc['timeFinish'] - dict_doc['timeBegin']}", win)
             if(save):
                 file.write(f"{doc.id.lstrip(code.upper())},{dict_doc['Mail']},{dict_doc['Score']},{dict_doc['Win']}, {dict_doc['timeFinish'] - dict_doc['timeBegin']}\n")
-    if(has_one):
-        win["k_history_box"].update(elements_list)
-    else:
-        win["k_history_box"].update([f"No certifications on record for code {code}"])
+    if(not has_one):
+        update_listbox(f"No certifications on record for code {code}", win)
 
 #Downloads to same folder a file containing the bank questions unencrypted
 def download_question_bank(code, win):
@@ -245,45 +242,49 @@ def download_question_bank(code, win):
     filename_encrypt = code + ".txt.xd"
     filename_decrypt = code + ".txt"
 
+    #Should be getting the latest as it creats a client each time the function is called
+    #and it's destroyed at the end of the function
     storage_client = storGC.Client.from_service_account_json(CREDENTIALS_PATH)
     bucket_bank = storage_client.bucket("unityloteria.appspot.com")
 
     try:
         blob = bucket_bank.blob(source_name)
         blob.download_to_filename(filename_encrypt)
-        win['k_history_box'].update(["Succesfully downloaded " + code])
+        update_listbox("Succesfully downloaded " + code, win)
     except:
-        win['k_history_box'].update(["Unable to download " + code])
+        update_listbox("Unable to download " + code, win)
         return -1
 
+    # Calls the external unecryption program so the file is unencrypted and saved, it return
+    # 0 when it finished succesfully, and -1 when it encountered an error somewhere in the
+    # process
     value = subprocess.run([UNECRYPT_FILE_PATH, filename_encrypt], capture_output=True)
     if(value.returncode == 0):
-        win['k_history_box'].update([f"Succesfully decrypted file {filename_decrypt}"])
+        update_listbox(f"Succesfully decrypted file {filename_decrypt}", win)
     else:
-        win['k_history_box'].update(["Unable to decrypt file"])
+        update_listbox("Unable to decrypt file", win)
+
 
 #Upload a file containing a new bank of questions with a given code and from a file
 def upload_question_bank(file, win):
     if not(Path(file).exists() and file.endswith('.txt')):
-        list_elements = win['k_history_box'].get_list_values()
-        list_elements.append([f"{file} is not a valid file to upload"])
-        win['k_history_box'].update(list_elements)
+        update_listbox(f"{file} is not a valid file to upload", win)
     else:
         up_file = file[file.rindex('/')+1:] + ".xd"
+        
+        # :Calls external encryption program so the file is encrypted and then uploaded to the
+        # cloud service
         value = subprocess.run([ENCRYPT_FILE_PATH, file], capture_output=True)
-        if(value.returncode != 0):
-            list_elements = win['k_history_box'].get_list_values()
-            list_elements.append([f"{up_file} was not succesfully encrypted"])
-            win['k_history_box'].update(list_elements)            
+        if(value.returncode != 0):      
+            update_listbox(f"{up_file} was not succesfully encrypted", win)      
         else:
             storage_client = storGC.Client.from_service_account_json(CREDENTIALS_PATH)
             bucket_bank = storage_client.bucket("unityloteria.appspot.com")
             blob = bucket_bank.blob(f"BankQuestions/{up_file}")
             
             blob.upload_from_filename(up_file)
-            list_elements = win['k_history_box'].get_list_values()
-            list_elements.append([f"{up_file} was succesfully uploaded"])
-            win['k_history_box'].update(list_elements)
+            
+            update_listbox(f"{up_file} was succesfully uploaded", win)
 
 if __name__ == "__main__":
     main()
