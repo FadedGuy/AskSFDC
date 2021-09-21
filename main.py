@@ -12,7 +12,7 @@ import subprocess
 INPUT_BOX_SIZE = (20,1)
 LISTBOX_SIZE = (85,10)
 ENCRYPT_FILE_PATH = "./EncryptFile.exe"
-UNECRYPT_FILE_PATH = "./DecryptFile.exe"
+UNECRYPT_FILE_PATH = "./Decrypt.exe"
 CREDENTIALS_PATH = "credentials.json"
 CREDENTIAL_CERTIFICATE = credentials.Certificate(CREDENTIALS_PATH) #check if path exists
 DEFAULT_APP = firebase_admin.initialize_app(CREDENTIAL_CERTIFICATE, {
