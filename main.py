@@ -18,7 +18,6 @@ CREDENTIAL_CERTIFICATE = credentials.Certificate(CREDENTIALS_PATH) #check if pat
 DEFAULT_APP = firebase_admin.initialize_app(CREDENTIAL_CERTIFICATE, {
     'storageBucket' : 'unityloteria.appspot.com'
 })
-# DB = firestore.client() #check_certificate()
 
 ###########################
 # TO CHECK
