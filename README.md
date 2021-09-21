@@ -3,4 +3,4 @@ GUI based app that allows you to control your Ask Salesforce certifications with
 
 ## Before you run
 Before you run the program it is imperative to add certain things to your program.
-*The .json containing your Firebase credentials is by default named "credentials.  json" in the same folder as the program, though, you can change it's location, just update the variable
+*The .json containing your Firebase credentials is by default named "credentials.json" in the same folder as the program, though, you can change it's location, just update the variable

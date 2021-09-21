@@ -1,8 +1,7 @@
 import firebase_admin
 from pathlib import Path
 import random
-from firebase_admin import credentials, auth, firestore, storage
-import google.auth
+from firebase_admin import credentials, auth, firestore
 from google.cloud import storage as storGC
 import PySimpleGUI as gui
 import datetime
@@ -20,7 +19,10 @@ DEFAULT_APP = firebase_admin.initialize_app(CREDENTIAL_CERTIFICATE, {
     'storageBucket' : 'unityloteria.appspot.com'
 })
 DB = firestore.client() #check_certificate()
+
 ###########################
+# TO CHECK
+#
 # Reload certifications so it includes new ones each time it is called since now
 # it only shows the ones that were when the program was initially called 
 # 
@@ -28,7 +30,7 @@ DB = firestore.client() #check_certificate()
 # depending on which mode it's supposed to use
 # 
 # Padding is invalid and cannot be removed.
-
+###########################
 
 def main():
     win = gui.Window("Ask Salesforce Admin", layout_creator())
@@ -41,7 +43,6 @@ def main():
                 add_user(values['k_val_deladd_field'], win)
             else:
                 show_alert("Fill in the requiered spaces")
-            #win["k_history_box"].Update([f"Added user {values['k_users_field']}"])
         elif event == "k_delete_users_btn":
             if(values['k_val_deladd_field'] != ""):
                 del_users(values['k_val_deladd_field'], win)
@@ -50,7 +51,7 @@ def main():
         elif event == "k_search_btn":
             search_users(values["k_val_search_field"], win)
         elif event == "k_code_btn":
-            check_certification(values["k_val_code_field"], values["k_code_cb"], win)
+            check_certification(values["k_val_code_field"], values["k_code_cb"], win)   
         elif event == "k_download_question_btn":
             download_question_bank(values["k_val_questions_field"], win)
         elif event == "k_upload_question_btn":
@@ -91,7 +92,7 @@ def layout_creator():
 
     action_history = [
         gui.Listbox(
-            values=[], enable_events=True,size=LISTBOX_SIZE, key = "k_history_box"
+            values=[], enable_events=True,size=LISTBOX_SIZE, key = "k_history_box", expand_x=True
         )
     ]
     
@@ -114,7 +115,7 @@ def new_listbox(text, win):
 
 #Creates popup window containing an alert raised by the program
 def show_alert(text):
-    gui.popup(text, title="Caution!")
+    gui.popup_error(text, title="Caution!", line_width=35, keep_on_top=True, modal=True)
 
 #Adds new user/s from a given mail or text file and calls create_user() for its creation 
 def add_user(text, win):
@@ -288,8 +289,3 @@ def upload_question_bank(file, win):
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
