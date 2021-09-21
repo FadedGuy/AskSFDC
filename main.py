@@ -5,6 +5,7 @@ from firebase_admin import credentials, auth, firestore
 from google.cloud import storage as storGC
 import PySimpleGUI as gui
 import datetime
+import string
 import subprocess
 
 ###########################
@@ -132,6 +133,13 @@ def add_user(text, win):
     else:
         show_alert("Invalid mail")
 
+def generate_password(size):
+    available_characters = string.ascii_lowercase + string.ascii_uppercase + string.punctuation + string.digits
+    pw = ""
+    for each in range(size):
+        pw = pw + available_characters[random.randint(0,len(available_characters)-1)]
+    print(pw)
+    return pw
 #Creates user from given mail with a random 6-digit numeric password, sends mail to change it as well
 def create_user(mail, win, allow_more_listbox):
     msg_cur = ""
@@ -139,7 +147,7 @@ def create_user(mail, win, allow_more_listbox):
         new_user = auth.create_user(
             email = mail,
             #Not the best for security since it can be brute force, but this ain't important, can be changed
-            password = str(random.randint(111111,999999)), 
+            password = generate_password(15), 
             disabled = False
         )
         msg_cur = f"Added new email {mail} succesfully"
