@@ -4,7 +4,6 @@ import random
 from firebase_admin import credentials, auth, firestore
 from google.cloud import storage as storGC
 import PySimpleGUI as gui
-import datetime
 import string
 import subprocess
 
@@ -19,6 +18,7 @@ CREDENTIAL_CERTIFICATE = credentials.Certificate(CREDENTIALS_PATH)
 DEFAULT_APP = firebase_admin.initialize_app(CREDENTIAL_CERTIFICATE, {
     'storageBucket' : 'unityloteria.appspot.com'
 })
+###########################
 
 def main():
     win = gui.Window("Ask Salesforce Admin", layout_creator())
