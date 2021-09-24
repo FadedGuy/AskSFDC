@@ -13,23 +13,12 @@ import subprocess
 INPUT_BOX_SIZE = (20,1)
 LISTBOX_SIZE = (85,10)
 MAX_HISTORY_SIZE = 9
-ENCRYPT_FILE_PATH = "./EncryptFile.exe"
-UNECRYPT_FILE_PATH = "./Decrypt.exe"
+CRYPTDECRYPT_FILE_PATH = "./CryptDecrypt.exe" 
 CREDENTIALS_PATH = "credentials.json"
 CREDENTIAL_CERTIFICATE = credentials.Certificate(CREDENTIALS_PATH)
 DEFAULT_APP = firebase_admin.initialize_app(CREDENTIAL_CERTIFICATE, {
     'storageBucket' : 'unityloteria.appspot.com'
 })
-
-###########################
-# TO CHECK
-#
-# Reload certifications so it includes new ones each time it is called since now
-# it only shows the ones that were when the program was initially called 
-# 
-# Should consider merging encryption and unencryption in the same executable and flag 
-# depending on which mode it's supposed to use
-###########################
 
 def main():
     win = gui.Window("Ask Salesforce Admin", layout_creator())
@@ -256,10 +245,8 @@ def download_question_bank(code, win):
         update_listbox("Unable to download " + code, win, False)
         return -1
 
-    # Calls the external unecryption program so the file is unencrypted and saved, it return
-    # 0 when it finished succesfully, and -1 when it encountered an error somewhere in the
-    # process
-    value = subprocess.run([UNECRYPT_FILE_PATH, filename_encrypt], capture_output=True)
+    #Runs the C# script for decrypting the file, it's use is script.exe filepath d. Returns 0 if succesfull, -1 if not
+    value = subprocess.run([CRYPTDECRYPT_FILE_PATH, filename_encrypt, "d"], capture_output=True)
     if(value.returncode == 0):
         update_listbox(f"Succesfully decrypted file {filename_decrypt}", win, False)
     else:
@@ -273,9 +260,8 @@ def upload_question_bank(file, win):
     else:
         up_file = file[file.rindex('/')+1:] + ".xd"
         
-        # Calls external encryption program so the file is encrypted and then uploaded to the
-        # cloud service
-        value = subprocess.run([ENCRYPT_FILE_PATH, file], capture_output=True)
+        #Runs the C# script for encrypting the file, it's use is script.exe filepath e. Returns 0 if succesfull, -1 if not
+        value = subprocess.run([CRYPTDECRYPT_FILE_PATH, file, "e"], capture_output=True)
         if(value.returncode != 0):      
             update_listbox(f"{up_file} was not succesfully encrypted", win, False)      
         else:
