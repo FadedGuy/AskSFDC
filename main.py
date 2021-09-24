@@ -12,10 +12,11 @@ import subprocess
 # CONSTANTS
 INPUT_BOX_SIZE = (20,1)
 LISTBOX_SIZE = (85,10)
+MAX_HISTORY_SIZE = 9
 ENCRYPT_FILE_PATH = "./EncryptFile.exe"
 UNECRYPT_FILE_PATH = "./Decrypt.exe"
 CREDENTIALS_PATH = "credentials.json"
-CREDENTIAL_CERTIFICATE = credentials.Certificate(CREDENTIALS_PATH) #check if path exists
+CREDENTIAL_CERTIFICATE = credentials.Certificate(CREDENTIALS_PATH)
 DEFAULT_APP = firebase_admin.initialize_app(CREDENTIAL_CERTIFICATE, {
     'storageBucket' : 'unityloteria.appspot.com'
 })
@@ -28,8 +29,6 @@ DEFAULT_APP = firebase_admin.initialize_app(CREDENTIAL_CERTIFICATE, {
 # 
 # Should consider merging encryption and unencryption in the same executable and flag 
 # depending on which mode it's supposed to use
-# 
-# Padding is invalid and cannot be removed.
 ###########################
 
 def main():
@@ -103,7 +102,7 @@ def layout_creator():
 #Updates action history box from GUI  
 def update_listbox(text, win, allow_more):
     listbox_elements = win["k_history_box"].get_list_values()
-    if(len(listbox_elements) > 10 or not allow_more):
+    if(len(listbox_elements) > MAX_HISTORY_SIZE or allow_more):
         new_listbox(text, win)
     else:
         listbox_elements.append([text])
@@ -112,6 +111,7 @@ def update_listbox(text, win, allow_more):
 #Clears action history and cleans new one
 def new_listbox(text, win):
     win['k_history_box'].update([text])
+
 
 #Creates popup window containing an alert raised by the program
 def show_alert(text):
@@ -138,15 +138,14 @@ def generate_password(size):
     pw = ""
     for each in range(size):
         pw = pw + available_characters[random.randint(0,len(available_characters)-1)]
-    print(pw)
     return pw
+
 #Creates user from given mail with a random 6-digit numeric password, sends mail to change it as well
 def create_user(mail, win, allow_more_listbox):
     msg_cur = ""
     try:
         new_user = auth.create_user(
             email = mail,
-            #Not the best for security since it can be brute force, but this ain't important, can be changed
             password = generate_password(15), 
             disabled = False
         )
@@ -193,9 +192,7 @@ def search_users(text, win):
                 page = page.get_next_page()
             msg = ""
             for user in auth.list_users().iterate_all():
-                ts = float(user.user_metadata.last_sign_in_timestamp)
-                ts = ts/1000
-                msg = f"Mail: {user.email}, UID: {user.uid}, Last Accesed: {datetime.datetime.utcfromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')}"
+                msg = f"Mail: {user.email}, UID: {user.uid}"
                 update_listbox(msg, win, True)            
         except:
             show_alert(f"Unable to get fetch users")
@@ -203,18 +200,14 @@ def search_users(text, win):
     elif(text.find('@') != -1):
         try:
             user = auth.get_user_by_email(text)
-            ts = float(user.user_metadata.last_sign_in_timestamp)
-            ts = ts/1000
-            msg = f"Mail: {user.email}, UID: {user.uid}, Last Accesed: {datetime.datetime.utcfromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')}"
+            msg = f"Mail: {user.email}, UID: {user.uid}"
             update_listbox(msg, win, False)
         except:
             show_alert(f"Unable to get user with mail: {text}")
     else:
         try:
             user = auth.get_user(text)
-            ts = float(user.user_metadata.last_sign_in_timestamp)
-            ts = ts/1000
-            msg = f"Mail: {user.email}, UID: {user.uid}, Last Accesed: {datetime.datetime.utcfromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')}"
+            msg = f"Mail: {user.email}, UID: {user.uid}"
             update_listbox(msg, win, False)
         except:
             show_alert(f"Unable to get user with UID: {text}")
